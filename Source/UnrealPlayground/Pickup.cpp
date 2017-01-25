@@ -7,6 +7,7 @@
 // Sets default values
 APickup::APickup()
 {
+
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -32,9 +33,15 @@ void APickup::BeginPlay()
 }
 
 // Called every frame
-void APickup::Tick( float DeltaTime )
+void APickup::Tick( float DeltaTime ) // DeltaTime is consistent time across computers, tick is called every frame
 {
 	Super::Tick( DeltaTime );
+
+	FVector NewLocation = GetActorLocation(); //create new vector equal to current actor location
+
+	NewLocation.Z += (DeltaTime * 100.f); // Z is an axis value member of FVectors, multiply DeltaTime by 100 because it is very small number
+
+	SetActorLocation(NewLocation); // set the actor location with an offset of Z - make the actors float
 
 }
 
