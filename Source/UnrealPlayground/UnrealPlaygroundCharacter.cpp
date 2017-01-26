@@ -52,6 +52,8 @@ AUnrealPlaygroundCharacter::AUnrealPlaygroundCharacter()
 	// Default offset from the character location for projectiles to spawn
 	GunOffset = FVector(100.0f, 30.0f, 10.0f);
 
+	bCanFire = true; //player can start firing initially
+
 	// Note: The ProjectileClass and the skeletal mesh/anim blueprints for Mesh1P, FP_Gun, and VR_Gun 
 	// are set in the derived blueprint asset named MyCharacter to avoid direct content references in C++.
 
@@ -115,7 +117,7 @@ void AUnrealPlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent
 	//InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &AUnrealPlaygroundCharacter::TouchStarted);
 	if (EnableTouchscreenMovement(PlayerInputComponent) == false)
 	{
-		PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AUnrealPlaygroundCharacter::OnFire);
+		PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AUnrealPlaygroundCharacter::RayCast); // fire button function call, !!!changed to call RayCast from OnFire
 	}
 
 	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AUnrealPlaygroundCharacter::OnResetVR);
@@ -134,46 +136,57 @@ void AUnrealPlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent
 
 void AUnrealPlaygroundCharacter::OnFire()
 {
-	// try and fire a projectile
-	if (ProjectileClass != NULL)
+	if (bCanFire)
 	{
-		UWorld* const World = GetWorld();
-		if (World != NULL)
+		bCanFire = false; // set ability to fire to false right after shot
+		// try and fire a projectile
+		if (ProjectileClass != NULL)
 		{
-			if (bUsingMotionControllers)
+			UWorld* const World = GetWorld();
+			if (World != NULL)
 			{
-				const FRotator SpawnRotation = VR_MuzzleLocation->GetComponentRotation();
-				const FVector SpawnLocation = VR_MuzzleLocation->GetComponentLocation();
-				World->SpawnActor<AUnrealPlaygroundProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
-			}
-			else
-			{
-				const FRotator SpawnRotation = GetControlRotation();
-				// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-				const FVector SpawnLocation = ((FP_MuzzleLocation != nullptr) ? FP_MuzzleLocation->GetComponentLocation() : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+				if (bUsingMotionControllers)
+				{
+					const FRotator SpawnRotation = VR_MuzzleLocation->GetComponentRotation();
+					const FVector SpawnLocation = VR_MuzzleLocation->GetComponentLocation();
+					World->SpawnActor<AUnrealPlaygroundProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+				}
+				else
+				{
+					const FRotator SpawnRotation = GetControlRotation();
+					// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
+					const FVector SpawnLocation = ((FP_MuzzleLocation != nullptr) ? FP_MuzzleLocation->GetComponentLocation() : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
 
-				// spawn the projectile at the muzzle
-				World->SpawnActor<AUnrealPlaygroundProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+					// spawn the projectile at the muzzle
+					World->SpawnActor<AUnrealPlaygroundProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+				}
 			}
 		}
-	}
 
-	// try and play the sound if specified
-	if (FireSound != NULL)
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
-	}
-
-	// try and play a firing animation if specified
-	if (FireAnimation != NULL)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = Mesh1P->GetAnimInstance();
-		if (AnimInstance != NULL)
+		// try and play the sound if specified
+		if (FireSound != NULL)
 		{
-			AnimInstance->Montage_Play(FireAnimation, 1.f);
+			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
 		}
+
+		// try and play a firing animation if specified
+		if (FireAnimation != NULL)
+		{
+			// Get the animation object for the arms mesh
+			UAnimInstance* AnimInstance = Mesh1P->GetAnimInstance();
+			if (AnimInstance != NULL)
+			{
+				AnimInstance->Montage_Play(FireAnimation, 1.f);
+			}
+		}
+		GetWorld()->GetTimerManager().SetTimer(FireDelayTimerHandle, this, &AUnrealPlaygroundCharacter::ResetFire, 3.0f, false); //timer delay, after 3 seconds call Reset Fire
 	}
+}
+
+void AUnrealPlaygroundCharacter::ResetFire()
+{
+	bCanFire = true; // firing is allowed
+	GetWorldTimerManager().ClearTimer(FireDelayTimerHandle); // reset the timer
 }
 
 void AUnrealPlaygroundCharacter::OnResetVR()
@@ -282,4 +295,23 @@ bool AUnrealPlaygroundCharacter::EnableTouchscreenMovement(class UInputComponent
 		PlayerInputComponent->BindTouch(EInputEvent::IE_Repeat, this, &AUnrealPlaygroundCharacter::TouchUpdate);
 	}
 	return bResult;
+}
+
+void AUnrealPlaygroundCharacter::RayCast()
+{
+	FHitResult* HitResult = new FHitResult();
+	FVector StartTrace = FirstPersonCameraComponent->GetComponentLocation(); // start the ray trace from the first person camera
+	FVector ForwardVector = FirstPersonCameraComponent->GetForwardVector();
+	FVector EndTrace = (ForwardVector * 5000.f) + StartTrace; //set the length of the raycast, multiply by 5000, add to the StartTrace
+	FCollisionQueryParams* CQP = new FCollisionQueryParams(); //collision query parameters
+
+	if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_Visibility, *CQP)) //if the ray cast was successfully sent to world
+	{
+		DrawDebugLine(GetWorld(), StartTrace, EndTrace, FColor(255, 0, 0), true); //draw a visual line
+
+		if (HitResult->GetActor() != NULL) //get the actor if a hit occurs
+		{
+			HitResult->GetActor()->Destroy(); // destory the hit actor
+		}
+	}
 }

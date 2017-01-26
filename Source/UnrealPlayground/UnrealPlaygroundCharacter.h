@@ -79,6 +79,15 @@ protected:
 	/** Fires a projectile. */
 	void OnFire();
 
+	/** True is the player can fire, else false */
+	bool bCanFire;
+
+	/** Handles delay between shots */
+	FTimerHandle FireDelayTimerHandle;
+
+	/** Resets player ability to fire */
+	void ResetFire();
+
 	/** Resets HMD orientation and position in VR. */
 	void OnResetVR();
 
@@ -125,6 +134,9 @@ protected:
 	 * @returns true if touch controls were enabled.
 	 */
 	bool EnableTouchscreenMovement(UInputComponent* InputComponent);
+
+private:
+	void RayCast();
 
 public:
 	/** Returns Mesh1P subobject **/
