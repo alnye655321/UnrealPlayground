@@ -59,6 +59,16 @@ void ASpookyCube::Tick( float DeltaTime )
 		RustMaterialInstance->SetScalarParameterValue(FName("RustAmount"), RustAmount);
 	}
 
+
+	// get all overlapping actors of the trigger - to log
+	CubeTrigger->GetOverlappingActors(arrOverlappedActors);	
+	for (int32 i = 0; i < arrOverlappedActors.Num(); i++)
+	{			
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, *arrOverlappedActors[i]->GetName());
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "hi");		
+		UE_LOG(LogTemp, Warning, TEXT("The overlapped actor is %d"), *arrOverlappedActors[i]->GetName());
+	}
+
 }
 
 void ASpookyCube::OnPlayerTriggerRust(UPrimitiveComponent * OverlappedComp, AActor * OtherActor, UPrimitiveComponent * OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)

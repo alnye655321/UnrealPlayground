@@ -45,4 +45,6 @@ private:
 	bool bRustEffectTriggered;
 
 	float RustAmount;
+
+	TArray<AActor*> arrOverlappedActors;
 };
